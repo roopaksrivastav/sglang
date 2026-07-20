@@ -115,8 +115,13 @@ def build_conv_slot_descriptor(tensors: List[torch.Tensor]) -> ConvSlotDescripto
         slot_stride.append(t.stride(1))
         max_feat = max(max_feat, t[0, 0].numel())
     to_i64 = lambda xs: torch.tensor(xs, dtype=torch.int64, device=device)
+    # Base addresses can exceed the signed-int64 range on some devices (e.g. XPU
+    # maps buffers high in the address space), so pack them as uint64 and
+    # bit-cast to the int64 the kernel reinterprets as a pointer — the 64-bit
+    # pattern is identical, only the Python-side dtype differs.
+    ptr_i64 = torch.tensor(ptr, dtype=torch.uint64, device=device).view(torch.int64)
     return ConvSlotDescriptor(
-        ptr=to_i64(ptr),
+        ptr=ptr_i64,
         feat=to_i64(feat),
         layer_stride=to_i64(layer_stride),
         slot_stride=to_i64(slot_stride),
