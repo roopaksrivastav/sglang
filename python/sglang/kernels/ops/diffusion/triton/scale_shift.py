@@ -428,14 +428,17 @@ def fuse_scale_shift_kernel(
         else:
             sh_sb = sh_sl = sh_sc = 0
 
-        # If both scalars and both zero, copy fast-path
-        if need_scale_scalar and need_shift_scalar:
-            if not (
-                scale_blc.any().to("cpu", non_blocking=True)
-                or shift_blc.any().to("cpu", non_blocking=True)
-            ):
-                output.copy_(x)
-                return output
+        # NOTE: a "both scalars and both zero -> output.copy_(x)" fast path used
+        # to live here. It decided by reading scale/shift back to the host
+        # (`scale_blc.any().to("cpu", non_blocking=True)` inside a Python `or`),
+        # and truthiness on those CPU tensors forces a device-to-host wait --
+        # which is illegal inside CUDA/XPU graph capture. It made this kernel
+        # uncapturable and broke breakable-CUDA-graph capture of the Wan DiT
+        # (RMSNormScaleShift.forward_native reaches it once per transformer
+        # block). Removing it costs nothing: with scale=shift=0 the kernel
+        # already computes x * (1.0 + 0) + 0 == x, and the copy_ it substituted
+        # moves exactly as many bytes as the kernel writes -- so the fast path
+        # was paying a full device sync to save nothing.
 
         grid = (triton.cdiv(L, block_l), triton.cdiv(C, block_c), B)
         fuse_scale_shift_kernel_blc_opt[grid](
