@@ -145,6 +145,8 @@ BREAKABLE_CUDA_GRAPH_SUPPORTED_MODEL_IDS = frozenset(
         "qwen-image-2512",
         "tongyi-mai/z-image",
         "tongyi-mai/z-image-turbo",
+        "wan-ai/wan2.1-t2v-1.3b-diffusers",
+        "wan2.1-t2v-1.3b-diffusers",
         "zai-org/glm-image",
         "z-image",
         "z-image-turbo",
@@ -156,6 +158,12 @@ BREAKABLE_CUDA_GRAPH_SUPPORTED_PIPELINE_CONFIGS = frozenset(
         "GlmImagePipelineConfig",
         "Ideogram4PipelineConfig",
         "QwenImagePipelineConfig",
+        # Verified on Wan2.1-T2V-1.3B only (fully resident DiT, no layerwise
+        # offload / FSDP). WanT2V720PConfig and the I2V configs subclass this
+        # one, so they are deliberately *not* listed -- BCG has not been
+        # validated there and larger Wan DiTs still need weight streaming, which
+        # graph capture cannot cover.
+        "WanT2V480PConfig",
         "ZImagePipelineConfig",
     }
 )
@@ -547,7 +555,8 @@ class ServerArgs(DisaggServerArgsMixin):
         logger.warning(
             "[Diffusion BCG] disabled for %s: only Ideogram-4, Qwen/Qwen-Image, "
             "Qwen/Qwen-Image-2512, Tongyi-MAI/Z-Image/Z-Image-Turbo, "
-            "and zai-org/GLM-Image are currently supported.",
+            "zai-org/GLM-Image, and Wan-AI/Wan2.1-T2V-1.3B-Diffusers are "
+            "currently supported.",
             pipeline_config_name,
         )
         self.enable_breakable_cuda_graph = False
